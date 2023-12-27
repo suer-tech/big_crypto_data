@@ -1,14 +1,18 @@
+from conf_db import db_name
 from db_crud import create_db, Crypto
 from price_api import get_usdt_data, get_kline_data
 
-create_db('Crypto')
+
+limit_kline = 500
+
+create_db(db_name)
 
 cryptos = get_usdt_data()
 
-for symbol in cryptos:
-    print(symbol)
-    crypto_items = Crypto(symbol)
-    data = get_kline_data(symbol, '1h', limit=500, startTime=None, endTime=None)
-    print(data)
-    print(data[0])
-    Crypto.add_data(data[0], data[3], data[2], data[5])
+data = {symbol: get_kline_data(symbol, '1h', limit=limit_kline, startTime=None, endTime=None) for symbol in cryptos}
+
+crypto_data = [Crypto(symbol, data_instance) for symbol, data_instance in data.items()]
+
+tables = [crypto.create_table() for crypto in crypto_data]
+
+save = [crypto_kline_data.save_to_database(i) for crypto_kline_data in crypto_data for i in range(limit_kline)]
