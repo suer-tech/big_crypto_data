@@ -1,7 +1,7 @@
-import requests
+import aiohttp
 
 
-def get_kline_data(symbol, interval, limit=500, startTime=None, endTime=None):
+async def get_kline_data(symbol, interval, limit=500, startTime=None, endTime=None):
     url = "https://fapi.binance.com/fapi/v1/klines"
     params = {
         "symbol": symbol,
@@ -10,28 +10,28 @@ def get_kline_data(symbol, interval, limit=500, startTime=None, endTime=None):
         "startTime": startTime,
         "endTime": endTime
     }
-    response = requests.get(url, params=params)
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, params=params) as response:
+            if response.status == 200:
+                return await response.json()
+            else:
+                print("Error occurred while retrieving Kline data:", response.text)
+                return None
 
-    if response.status_code == 200:
-        return response.json()
-    else:
-        print("Error occurred while retrieving Kline data:", response.text)
-        return None
 
-
-def get_symbol_price_ticker():
+async def get_symbol_price_ticker():
     url = "https://fapi.binance.com/fapi/v1/ticker/price"
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        print("Error occurred while retrieving Kline data:", response.text)
-        return None
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 200:
+                sym_index = await response.json()
+                return [sym['symbol'] for sym in sym_index if sym['symbol'].endswith('USDT')]
+            else:
+                print("Error occurred while retrieving Kline data:", await response.text())
+                return None
 
 
-def get_usdt_data():
-    symb_index = get_symbol_price_ticker()
-    return [symb['symbol'] for symb in symb_index if symb['symbol'].endswith('USDT')]
+
 
 
 
