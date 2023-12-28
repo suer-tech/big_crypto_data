@@ -1,13 +1,12 @@
 from conf_db import db_name
 from db_crud import create_db, Crypto
-from price_api import get_usdt_data, get_kline_data
-
+from price_api import get_kline_data, get_symbol_price_ticker
 
 limit_kline = 500
 
 create_db(db_name)
 
-cryptos = get_usdt_data()
+cryptos = get_symbol_price_ticker()
 
 data = {symbol: get_kline_data(symbol, '1h', limit=limit_kline, startTime=None, endTime=None) for symbol in cryptos}
 
