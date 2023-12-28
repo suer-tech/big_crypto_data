@@ -1,14 +1,13 @@
 import aiohttp
 
 
-async def get_kline_data(symbol, interval, limit=500, startTime=None, endTime=None):
+async def get_kline_data(symbol, interval, limit=500):
     url = "https://fapi.binance.com/fapi/v1/klines"
     params = {
         "symbol": symbol,
         "interval": interval,
         "limit": limit,
-        "startTime": startTime,
-        "endTime": endTime
+
     }
     async with aiohttp.ClientSession() as session:
         async with session.get(url, params=params) as response:

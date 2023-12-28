@@ -10,6 +10,7 @@ async def main():
     await create_db(db_name)
 
     cryptos = await get_symbol_price_ticker()
+    print(cryptos)
 
     if cryptos:
 
