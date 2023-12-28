@@ -36,7 +36,7 @@ class Crypto:
         try:
             async with conn.transaction():
                 await conn.execute(f'''
-                    CREATE TABLE IF NOT EXISTS {self.symbol}_table (
+                    CREATE TABLE IF NOT EXISTS _{self.symbol}_table (
                         id SERIAL PRIMARY KEY,
                         symbol VARCHAR(50),
                         timestamp BIGINT,
@@ -45,7 +45,7 @@ class Crypto:
                         volume DECIMAL
                     )
                 ''')
-                print(f'success create table {self.symbol}_table')
+                print(f'success create table _{self.symbol}_table')
 
         except asyncpg.exceptions.PostgresError as e:
             print(f"Ошибка при создании таблицы: {e}")
@@ -53,7 +53,7 @@ class Crypto:
         finally:
             # Закрытие соединения
             if conn is not None:
-                await conn.commit()
+                await conn.close()
 
     async def save_to_database(self, i):
         self.timestamp = int(self.data[i][0])
@@ -65,10 +65,10 @@ class Crypto:
         try:
             async with conn.transaction():
                 await conn.execute(f'''
-                    INSERT INTO {self.symbol}_table (symbol, timestamp, low_price, high_price, volume)
+                    INSERT INTO _{self.symbol}_table (symbol, timestamp, low_price, high_price, volume)
                     VALUES ($1, $2, $3, $4, $5)
-                ''', (self.symbol, self.timestamp, self.low_price, self.high_price, self.volume))
-                print(f'success add data on table {self.symbol}_table')
+                ''', self.symbol, self.timestamp, self.low_price, self.high_price, self.volume)
+                print(f'success add data on table _{self.symbol}_table')
 
         except asyncpg.exceptions.PostgresError as e:
             print(f"Ошибка при загрузке данных в таблицу {self.symbol}_table: {e}")
@@ -76,4 +76,4 @@ class Crypto:
         finally:
             # Закрытие соединения
             if conn is not None:
-                await conn.commit()
+                await conn.close()
