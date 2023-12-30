@@ -1,21 +1,14 @@
 import aiohttp
 
 
-async def get_kline_data(symbol, interval, limit=500):
+async def get_symbol_kline_data(session, symbol, params):
     url = "https://fapi.binance.com/fapi/v1/klines"
-    params = {
-        "symbol": symbol,
-        "interval": interval,
-        "limit": limit,
-
-    }
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, params=params) as response:
-            if response.status == 200:
-                return await response.json()
-            else:
-                print("Error occurred while retrieving Kline data:", response.text)
-                return None
+    async with session.get(url, params=params) as response:
+        if response.status == 200:
+            return {symbol: await response.json()}
+        else:
+            print("Error occurred while retrieving Kline data:", response.text)
+            return None
 
 
 async def get_symbol_price_ticker():
