@@ -11,27 +11,47 @@ from conf_db import conn_params
 
 
 interval = '1h'
-limit_kline = 1000
+limit_kline = 100
+
+
+async def request_data(session, all_crypto):
+    tasks = []
+    for crypto in all_crypto:
+        params = {
+            "symbol": crypto,
+            "interval": interval,
+            "limit": limit_kline,
+        }
+        symbol_kline_data = get_symbol_kline_data(session, crypto, params)
+        tasks.append(symbol_kline_data)
+
+    return await asyncio.gather(*tasks)
 
 
 async def main():
-
     await create_db(db_name)
 
     all_crypto = await get_symbol_price_ticker()
 
-    async with aiohttp.ClientSession() as session:
-        tasks = []
-        for crypto in all_crypto:
-            params = {
-                "symbol": crypto,
-                "interval": interval,
-                "limit": limit_kline,
-            }
-            symbol_kline_data = get_symbol_kline_data(session, crypto, params)
-            tasks.append(symbol_kline_data)
+    all_crypto_kline_data = []
 
-        all_crypto_kline_data = await asyncio.gather(*tasks)
+    async with aiohttp.ClientSession() as session:
+        for i in range(2):
+            print(f'iterattion {i}')
+            data = await request_data(session, all_crypto)
+            if data:
+                if i > 0:
+                    for d in data:
+                        for symbol, nested_list in d.items():
+                            for inner_list in nested_list:
+                                for x in range(len(inner_list)):
+                                    if isinstance(inner_list[x], float):
+                                        inner_list[x] = str(float(inner_list[x]) * 1.1)
+                                    elif isinstance(inner_list[x], int):
+                                        inner_list[x] = str(int(inner_list[x]) + 1)
+
+            all_crypto_kline_data += data
+
 
         crypto_objects = [Crypto(symbol, kline_data) for crypto_kline_data in all_crypto_kline_data for symbol, kline_data in crypto_kline_data.items()]
 
