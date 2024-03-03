@@ -1,63 +1,43 @@
 import asyncio
-import logging
-
 import aiohttp
 import asyncpg
 
 from conf_db import db_name
-from db_crud import create_db, Crypto, create_table
+from db_crud import create_db, Crypto, get_names_of_tables_in_db, create_corr_data
 from price_api import get_symbol_price_ticker, get_symbol_kline_data
 from conf_db import conn_params
 
-
 interval = '1h'
-limit_kline = 100
+limit_kline = 500
 
 
-async def request_data(session, all_crypto):
-    tasks = []
-    for crypto in all_crypto:
-        params = {
-            "symbol": crypto,
-            "interval": interval,
-            "limit": limit_kline,
-        }
-        symbol_kline_data = get_symbol_kline_data(session, crypto, params)
-        tasks.append(symbol_kline_data)
-
-    return await asyncio.gather(*tasks)
-
-
-async def main():
+async def create_first_crypto_data_in_db():
     await create_db(db_name)
-
     all_crypto = await get_symbol_price_ticker()
+    if all_crypto:
+        async with aiohttp.ClientSession() as session:
+            tasks = []
+            for crypto in all_crypto:
+                params = {
+                    "symbol": crypto,
+                    "interval": interval,
+                    "limit": limit_kline,
+                }
+                symbol_kline_data = get_symbol_kline_data(session, crypto, params)
+                tasks.append(symbol_kline_data)
+            all_crypto_kline_data = await asyncio.gather(*tasks)
 
-    all_crypto_kline_data = []
-
-    async with aiohttp.ClientSession() as session:
-        for i in range(2):
-            print(f'iterattion {i}')
-            data = await request_data(session, all_crypto)
-            if data:
-                if i > 0:
-                    for d in data:
-                        for symbol, nested_list in d.items():
-                            for inner_list in nested_list:
-                                for x in range(len(inner_list)):
-                                    if isinstance(inner_list[x], float):
-                                        inner_list[x] = str(float(inner_list[x]) * 1.1)
-                                    elif isinstance(inner_list[x], int):
-                                        inner_list[x] = str(int(inner_list[x]) + 1)
-
-            all_crypto_kline_data += data
-
-
-        crypto_objects = [Crypto(symbol, kline_data) for crypto_kline_data in all_crypto_kline_data for symbol, kline_data in crypto_kline_data.items()]
+        crypto_objects = [Crypto(symbol, kline_data) for crypto_kline_data in all_crypto_kline_data for
+                          symbol, kline_data in crypto_kline_data.items()]
 
         pool = await asyncpg.create_pool(**conn_params)
 
-        await create_table(pool)
+        db_table_create_tasks = []
+        for crypto_obj in crypto_objects:
+            crypto_table_create = crypto_obj.create_table(pool)
+            db_table_create_tasks.append(crypto_table_create)
+
+        await asyncio.gather(*db_table_create_tasks)
 
         db_data_save_tasks = []
         for crypto_obj in crypto_objects:
@@ -69,8 +49,10 @@ async def main():
 
         await pool.close()
 
-        from price_api import total_requests
-        print("Total requests made:", total_requests)
 
+async def main():
+    pool = await asyncpg.create_pool(**conn_params)
+    tables_in_db = await get_names_of_tables_in_db(pool)
+    await create_corr_data(pool, tables_in_db)
 
 asyncio.run(main())
