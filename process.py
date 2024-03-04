@@ -1,9 +1,13 @@
 import asyncio
+import itertools
+import time
+
 import aiohttp
 import asyncpg
 
 from conf_db import db_name
-from db_crud import create_db, Crypto, get_names_of_tables_in_db, create_corr_data
+from db_crud import create_db, Crypto, get_names_of_tables_in_db, create_corr_data_table, \
+    fetch_and_insert_data
 from price_api import get_symbol_price_ticker, get_symbol_kline_data
 from conf_db import conn_params
 
@@ -51,8 +55,25 @@ async def create_first_crypto_data_in_db():
 
 
 async def main():
-    pool = await asyncpg.create_pool(**conn_params)
-    tables_in_db = await get_names_of_tables_in_db(pool)
-    await create_corr_data(pool, tables_in_db)
+    start = time.time()
+    # await create_first_crypto_data_in_db()
+
+    async with await asyncpg.create_pool(**conn_params, max_size=1000) as pool:
+        tables_in_db = await get_names_of_tables_in_db(pool)
+
+        await create_corr_data_table(pool)
+
+        tasks = []
+        for x, y in itertools.permutations(tables_in_db, 2):
+            task = asyncio.create_task(fetch_and_insert_data(pool, x, y))
+            tasks.append(task)
+
+        await asyncio.gather(*tasks)
+
+        await pool.close()
+
+    end = time.time()
+    res = end-start
+    print(res)
 
 asyncio.run(main())

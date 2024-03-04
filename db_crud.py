@@ -1,4 +1,5 @@
 import asyncio
+import itertools
 
 import asyncpg
 
@@ -107,7 +108,33 @@ async def get_names_of_tables_in_db(pool):
             print(f"Ошибка при получении имен таблиц: {e}")
 
 
-async def create_corr_data(pool, tables_in_db):
+async def fetch_and_insert_data(pool, x, y):
+    try:
+        async with pool.acquire() as connection:
+            result = await connection.fetch(f'''
+                    SELECT {x}.timestamp,
+                            {x}.symbol || {y}.symbol) AS pare,
+                            (({x}.high_price - {x}.low_price) / ({x}.low_price / 100) -
+                            ({y}.high_price - {y}.low_price) / ({y}.low_price / 100)) AS diff
+                    FROM {x} JOIN {y} ON {x}.timestamp = {y}.timestamp
+                    ''')
+
+            for row in result:
+                timestamp = row['timestamp']
+                pare = row['pare']
+                diff = row['diff']
+
+                await connection.execute('''
+                        INSERT INTO corr_data (timestamp, pare, diff)
+                        VALUES ($1, $2, $3)
+                        ''', timestamp, pare, diff)
+                print(f'success add data on table corr_data for {x} and {y}')
+
+    except asyncpg.exceptions.PostgresError as e:
+        print(f"Ошибка при выполнении запроса: {e}")
+
+
+async def create_corr_data_table(pool):
     async with pool.acquire() as connection:
         try:
             async with connection.transaction():
@@ -120,27 +147,8 @@ async def create_corr_data(pool, tables_in_db):
                 ''')
                 print(f'success create table corr_data')
 
-                for x in tables_in_db:
-                    for y in tables_in_db:
-                        if x != y:
-                            result = await connection.fetch(f'''
-                                SELECT {x}.timestamp,
-                                        ({x}.symbol || {y}.symbol) AS pare,
-                                       (({x}.high_price - {x}.low_price) * 100 / {x}.low_price -
-                                         ({y}.high_price - {y}.low_price) * 100 / {y}.low_price) AS diff
-                                FROM {x} JOIN {y} ON {x}.timestamp = {y}.timestamp
-                                ''')
-
-                            for row in result:
-                                timestamp = row['timestamp']
-                                pare = row['pare']
-                                diff = row['diff']
-
-                                await connection.execute(f'''
-                                    INSERT INTO corr_data (timestamp, pare, diff)
-                                    VALUES ($1, $2, $3)
-                                    ''', timestamp, pare, diff)
-                                print(f'success add data on table corr_data for {x} and {y}')
-
         except asyncpg.exceptions.PostgresError as e:
-            print(f"Ошибка при загрузке данных: {e}")
+            print(f"Ошибка при создании таблицы corr_data: {e}")
+
+
+
