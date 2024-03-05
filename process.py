@@ -55,9 +55,10 @@ async def create_first_crypto_data_in_db():
 
 
 async def main():
+    semaphore = asyncio.Semaphore(50)
     start = time.time()
     # await create_first_crypto_data_in_db()
-
+    await asyncio.sleep(0)
     async with await asyncpg.create_pool(**conn_params, max_size=1000) as pool:
         tables_in_db = await get_names_of_tables_in_db(pool)
 
@@ -65,9 +66,11 @@ async def main():
 
         tasks = []
         for x, y in itertools.permutations(tables_in_db, 2):
+
             task = asyncio.create_task(fetch_and_insert_data(pool, x, y))
             tasks.append(task)
 
+        # async with semaphore:
         await asyncio.gather(*tasks)
 
         await pool.close()

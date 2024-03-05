@@ -113,9 +113,11 @@ async def fetch_and_insert_data(pool, x, y):
         async with pool.acquire() as connection:
             result = await connection.fetch(f'''
                     SELECT {x}.timestamp,
-                            {x}.symbol || {y}.symbol) AS pare,
-                            (({x}.high_price - {x}.low_price) / ({x}.low_price / 100) -
-                            ({y}.high_price - {y}.low_price) / ({y}.low_price / 100)) AS diff
+                            ({x}.symbol || {y}.symbol) AS pare,
+                            (
+                            ({x}.high_price - {x}.low_price) / ({x}.low_price / 100) -
+                            ({y}.high_price - {y}.low_price) / ({y}.low_price / 100)
+                            ) AS diff
                     FROM {x} JOIN {y} ON {x}.timestamp = {y}.timestamp
                     ''')
 
